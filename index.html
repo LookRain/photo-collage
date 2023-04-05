@@ -29,21 +29,20 @@
           Create Collage!
         </button>
       </form>
-      <div class="my-4">
-        <canvas id="canvas"></canvas>
-      </div>
       <button
         type="button"
         class="btn btn-primary"
         id="download"
         download="collage.png"
+        style="margin-top: 1em;"
       >
         Download Collage
       </button>
+      <div class="my-4">
+        <canvas id="canvas"></canvas>
+      </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
 
     <script>
@@ -71,51 +70,57 @@
         }
         return result;
       }
+      async function calculateCanvasSize(files, margin, totalWidth) {
+        let totalHeight = margin;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const img = new Image();
+          const promise = new Promise((resolve, reject) => {
+            img.onload = function () {
+              const aspectRatio = img.width / img.height;
+              const height = totalWidth / aspectRatio;
+              resolve(height);
+            };
+            img.onerror = function () {
+              reject();
+            };
+          });
+          img.src = URL.createObjectURL(file);
+          try {
+            const height = await promise;
+            if (i === files.length - 1) {
+              totalHeight += height;
+            } else {
+              totalHeight += height + margin;
+            }
+          } catch {
+            console.error(`Could not load image ${file.name}`);
+          }
+        }
+        return {
+          width: totalWidth,
+          height: totalHeight
+        };
+      }
 
       async function createCollage() {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         const files = document.getElementById("input").files;
         const margin = parseInt(document.getElementById("margin").value);
         console.log("margin", margin);
         const totalWidth = await getLargestWidth(files);
-        let yOffset = margin;
+        let yOffset = 0;
         let totalHeight = margin;
 
-        async function calculateCanvasSize(files, margin, totalWidth) {
-          let totalHeight = margin;
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const img = new Image();
-            const promise = new Promise((resolve, reject) => {
-              img.onload = function () {
-                const aspectRatio = img.width / img.height;
-                const height = totalWidth / aspectRatio;
-                resolve(height);
-              };
-              img.onerror = function () {
-                reject();
-              };
-            });
-            img.src = URL.createObjectURL(file);
-            try {
-              const height = await promise;
-              totalHeight += margin + height;
-            } catch {
-              console.error(`Could not load image ${file.name}`);
-            }
-          }
-          return {
-            width: totalWidth + margin * 2,
-            height: totalHeight + margin * 2
-          };
-        }
         const res = await calculateCanvasSize(files, margin, totalWidth);
         console.log(res);
         canvas.width = res.width;
         canvas.height = res.height;
+
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         async function draw(img, xOffset, yOffset) {
           return new Promise((resolve) => {
             img.onload = function () {
@@ -137,11 +142,16 @@
           yOffset += margin + increment; // Use height here
         }
       }
-      var download = document.getElementById("download");
-      download.addEventListener("click", function () {
-        var canvas = document.getElementById("canvas");
-        var dataURL = canvas.toDataURL("image/png");
-        download.href = dataURL;
+
+      const downloadBtn = document.getElementById("download");
+      downloadBtn.addEventListener("click", function () {
+        const dataURL = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.href = dataURL;
+        link.download = "collage.png";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       });
     </script>
   </body>
