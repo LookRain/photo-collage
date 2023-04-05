@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Photo Collage App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    />
+    <style>
+      body {
+        background: #eeeeee;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h1 class="mb-4">Photo Collage App</h1>
+      <form>
+        <div class="form-group">
+          <label for="input">Select images to create a collage:</label>
+          <input type="file" class="form-control-file" id="input" multiple />
+        </div>
+        <div class="form-group">
+          <label for="input">Margin:</label>
+          <input id="margin" type="number" class="form-control" value="10" />
+        </div>
+        <button type="button" class="btn btn-primary" onclick="createCollage()">
+          Create Collage!
+        </button>
+      </form>
+      <div class="my-4">
+        <canvas id="canvas"></canvas>
+      </div>
+      <button
+        type="button"
+        class="btn btn-primary"
+        id="download"
+        download="collage.png"
+      >
+        Download Collage
+      </button>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+
+    <script>
+      async function getLargestWidth(files, margin) {
+        let totalHeight = margin;
+        let result = 0;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const img = new Image();
+          const promise = new Promise((resolve, reject) => {
+            img.onload = function () {
+              resolve(img.width);
+            };
+            img.onerror = function () {
+              reject();
+            };
+          });
+          img.src = URL.createObjectURL(file);
+          try {
+            const width = await promise;
+            if (width > result) result = width;
+          } catch {
+            console.error(`Could not load image ${file.name}`);
+          }
+        }
+        return result;
+      }
+
+      async function createCollage() {
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const files = document.getElementById("input").files;
+        const margin = parseInt(document.getElementById("margin").value);
+        console.log("margin", margin);
+        const totalWidth = await getLargestWidth(files);
+        let yOffset = margin;
+        let totalHeight = margin;
+
+        async function calculateCanvasSize(files, margin, totalWidth) {
+          let totalHeight = margin;
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const img = new Image();
+            const promise = new Promise((resolve, reject) => {
+              img.onload = function () {
+                const aspectRatio = img.width / img.height;
+                const height = totalWidth / aspectRatio;
+                resolve(height);
+              };
+              img.onerror = function () {
+                reject();
+              };
+            });
+            img.src = URL.createObjectURL(file);
+            try {
+              const height = await promise;
+              totalHeight += margin + height;
+            } catch {
+              console.error(`Could not load image ${file.name}`);
+            }
+          }
+          return {
+            width: totalWidth + margin * 2,
+            height: totalHeight + margin * 2
+          };
+        }
+        const res = await calculateCanvasSize(files, margin, totalWidth);
+        console.log(res);
+        canvas.width = res.width;
+        canvas.height = res.height;
+        async function draw(img, xOffset, yOffset) {
+          return new Promise((resolve) => {
+            img.onload = function () {
+              const aspectRatio = img.width / img.height;
+              height = totalWidth / aspectRatio; // Update height here
+              console.log({ totalWidth, height });
+              ctx.drawImage(img, xOffset, yOffset, totalWidth, height);
+              resolve(height + margin);
+            };
+          });
+        }
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const img = new Image();
+          let height = 0; // Lifted out of closure
+
+          img.src = URL.createObjectURL(file);
+          const increment = await draw(img, 0, yOffset);
+          yOffset += margin + increment; // Use height here
+        }
+      }
+      var download = document.getElementById("download");
+      download.addEventListener("click", function () {
+        var canvas = document.getElementById("canvas");
+        var dataURL = canvas.toDataURL("image/png");
+        download.href = dataURL;
+      });
+    </script>
+  </body>
+</html>
